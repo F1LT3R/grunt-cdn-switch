@@ -13,7 +13,7 @@ var Promise = require('bluebird')
   , cheerio = require('cheerio')
   , http = require('http')
   , fs = require('fs')
-  // , mkdirp = require('mkdirp')
+  , mkdirp = require('mkdirp')
   ;
 
 
@@ -34,7 +34,7 @@ module.exports = function(grunt) {
 
 
 
-  // mkdirp(options.local_path);
+  mkdirp(options.local_path);
 
   function fetch(url){
     return new Promise(function(resolve, reject) {
@@ -46,6 +46,12 @@ module.exports = function(grunt) {
 
       var request = http.get(url, function(response) {
         response.pipe(file);
+
+        if (response.statusCode.toString()[0]==='4'){
+          var error = {};
+          error[response.statusCode] = url;
+          reject(error);
+        }
       }).on('error', function(e){
         reject(e);
       }).on('end', function(){
@@ -56,33 +62,64 @@ module.exports = function(grunt) {
     });
   }
 
-
-
     var fetchPromises = [];
     options.remote.forEach(function(url){
-      var fetchFile = fetch(url).then(function (filename){
+      var fetchFile = fetch(url)
+      .then(function (filename){
           grunt.log.writeln('Got: ' + filename);
+          return filename;
       });
       fetchPromises.push(fetchFile);
     });
 
 
     Promise.settle(fetchPromises).then(function(results){
+      console.log('Done fetching all resources.');
+      var errorCount = 0;
+
       results.forEach(function(result){
         if(result.isFulfilled()){
-          // console.log('Fulfilled');
+          // console.log(result);
         } else {
-             // access result.reason()
-          // console.log(result.reason());
+          errorCount+=1;
           grunt.log.error('Fetch Error: ' , result.reason());
         }
       });
-      console.log('Done fetching all resources.');
+
+      if (errorCount===0) {
+        grunt.log.ok('All files fetched and saved to: \''+options.local_path+'\'');
+      }
     });
 
+    var theTarget = this.target;
 
     // Iterate over all specified fi groups.
     this.files.forEach(function(f) {
+
+
+      var t = 0;
+      function filterHtml(node){
+        var childNodes = node.children;
+        node.children.forEach(function(child){
+          t++;
+
+          console.log(t, child.name, child.type);
+          if (child.type === 'comment'){
+            var splits = child.data.split('=');
+
+            if (splits[0]===' cdn-switch' && splits[1]===theTarget+' ') {
+              // $(child).replaceWith('ok ok ok!');
+              $(child).replaceWith('ok ok ok!');
+            }
+          }
+
+          if (child.hasOwnProperty('children')){
+            filterHtml(child);
+          }
+        });
+      }
+
+
       // Concat specified files.
       var src = f.src.filter(function(filepath) {
         // Warn on and remove invalid source files (if nonull was set).
@@ -97,10 +134,12 @@ module.exports = function(grunt) {
         return grunt.file.read(filepath);
       }).join(grunt.util.normalizelf(options.separator));
 
-
       var $ = cheerio.load(src);
-      // filterHtml($._root);
-      console.log('done scanning ');
+      filterHtml($._root);
+      src = $.html();
+
+      // console.log('Scanned DOM in: \''+filepath+'\'');
+      console.log('Scanned DOM.');
 
       // Handle options.
       // src += options.punctuation;
@@ -115,20 +154,3 @@ module.exports = function(grunt) {
 
 };
 
-var t = 0;
-
-function filterHtml(node){
-
-  var childNodes = node.children;
-  node.children.forEach(function(child){
-    t++;
-
-    console.log(t, child.name, child.type);
-    if (child.type === 'comment')
-      console.log(child.data.split('='));
-
-    if (child.hasOwnProperty('children'))
-      filterHtml(child);
-  });
-
-}

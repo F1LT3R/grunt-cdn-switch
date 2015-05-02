@@ -38,7 +38,7 @@ module.exports = function(grunt) {
           always_fetch: false,
           local_path: 'tmp/static',
           remote: [
-            'http://cdnjs.cloudflare.com/ajax/libs/angslular.js/1.3.15/angular.min.js',
+            'http://cdnjs.cloudflare.com/ajax/libs/angular.js/1.3.15/angular.min.js',
             'http://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular-animate.js',
             'http://cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.13/angular-ui-router.min.js',
             'http://tombatossals.github.io/angular-leaflet-directive/dist/angular-leaflet-directive.min.js',
