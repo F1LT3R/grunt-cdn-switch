@@ -36,7 +36,7 @@ module.exports = function(grunt) {
         options: {
           template: '<script src="{{remote}}"></script>',
           always_fetch: false,
-          local_path: 'static',
+          local_path: 'tmp/static',
           remote: [
             'http://cdnjs.cloudflare.com/ajax/libs/angslular.js/1.3.15/angular.min.js',
             'http://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular-animate.js',
