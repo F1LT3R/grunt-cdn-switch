@@ -31,136 +31,164 @@ module.exports = function(grunt) {
       punctuation: '.',
       separator: ', '
     });
-    // console.log('opts', options.cdn);
 
+    mkdirp(options.local_path);
 
+    function checkFileExists(file){
+      var path = file.path;
 
-  mkdirp(options.local_path);
-
-  function checkFileExists(file){
-    var path = file.path;
-
-    return new Promise(function(resolve, reject){
-      fs.exists(path, function(exists) {
-        resolve({
-          path: path,
-          origin: file.origin,
-          exists: exists
-        });
-      });
-    });
-  }
-  function checkFileModifiedDate(file){
-    var path = file.path;
-
-    return new Promise(function(resolve, reject){
-      if (file.exists) {
-
-        fs.stat(path, function(err, stats){
+      return new Promise(function(resolve, reject){
+        fs.exists(path, function(exists) {
           resolve({
             path: path,
             origin: file.origin,
-            modified: moment(stats.mtime).unix(),
-            exists: true
+            exists: exists
           });
         });
+      });
+    }
 
-      } else {
+    function checkFileModifiedDate(file){
+      var path = file.path;
+      return new Promise(function(resolve, reject){
 
-        resolve({
-          path: path,
-          origin: file.origin,
-          modified: null,
-          exists: false
+        if (file.exists) {
+
+          fs.stat(path, function(err, stats){
+            resolve({
+              path: path,
+              origin: file.origin,
+              modified: stats.mtime,
+              exists: true
+            });
+          });
+
+        } else {
+
+          resolve({
+            path: path,
+            origin: file.origin,
+            modified: null,
+            exists: false
+          });
+
+        }
+      });
+    }
+
+
+    function requestHandler(file){
+      return new Promise(function(resolve, reject){
+        var path = file.path
+          , url = file.origin
+          , localModified = file.modified
+          ;
+
+
+        var request = http.get(url, function(response) {
+          var remoteModified = response.headers['last-modified']
+            , localTime = new Date(localModified).getTime()
+            , remoteTime = new Date(remoteModified).getTime()
+            ;
+
+          // Duck out if there are HTTP Status code errors
+          if (remoteTime > localTime) {
+            // var file = fs.createWriteStream(options.local_path+'/'+file.pathname);
+            var file = fs.createWriteStream(path);
+            response.pipe(file);
+          } else {
+            request.end();
+            resolve({
+              notmodified: true,
+              path: path
+            });
+          }
+
+          // Duck out if there are HTTP Status code errors
+          if (response.statusCode.toString()[0] === '4'){
+            var error = {};
+            error[response.statusCode] = url;
+            reject(error);
+          }
+
+        // Handle other events
+        }).on('error', function(e){
+          reject(e);
+        }).on('end', function(){
+          resolve(path);
+        }).on('close', function(){
+          resolve(path);
         });
 
-      }
-    });
-  }
-
-
-  function requestHandler(file){
-    return new Promise(function(resolve, reject){
-      var path = file.path
-        , url = file.origin
-        , localModified = file.modified
-        ;
-
-
-      var request = http.get(url, function(response) {
-      var lastModified = response.headers['last-modified'];
-
-        console.log(moment(lastModified).unix());
-
-        // var file = fs.createWriteStream(options.local_path+'/'+file.pathname);
-        var file = fs.createWriteStream(path);
-        response.pipe(file);
-
-        if (response.statusCode.toString()[0]==='4'){
-          var error = {};
-          error[response.statusCode] = url;
-          reject(error);
-        }
-      }).on('error', function(e){
-        reject(e);
-      }).on('end', function(){
-        resolve(path);
-      }).on('close', function(){
-        resolve(path);
       });
+    }
 
-    });
-  }
-
-  function fetch(url){
-    return new Promise(function(resolve, reject) {
-
+    function fetch(url){
       var filename = url.slice(url.lastIndexOf('/')+1);
       var local_filepath = options.local_path+'/'+filename;
       grunt.log.writeln('Need: ' + url);
 
-      checkFileExists({
+      return checkFileExists({
         path: local_filepath,
         origin: url
       })
       .then(checkFileModifiedDate)
       .then(requestHandler);
+    }
 
-    });
-  }
+    function fetch_new () {
+      var fetchPromises = [];
 
-    var fetchPromises = [];
-    options.resources.forEach(function(url){
-      var fetchFile = fetch(url)
-      .then(function (filename){
-          grunt.log.writeln('Got: ' + filename);
-          return filename;
+      // Create a promise for each fle
+      options.resources.forEach(function(url){
+        var fetchFile = fetch(url).then(function (response){
+
+          if (response.notmodified) {
+            grunt.log.warn('Not modified: ' + response.path);
+          } else {
+            grunt.log.ok('Got: ' + response);
+          }
+          return response.path;
+
+        });
+
+        // Push the new promise onto the stacl
+        fetchPromises.push(fetchFile);
       });
-      fetchPromises.push(fetchFile);
-    });
 
+      // Wait until all the promises are resolved, then settle
+      Promise.settle(fetchPromises).then(function(results){
+        grunt.log.writeln('Done fetching/checking resources.');
+        var errorCount = 0;
 
-    Promise.settle(fetchPromises).then(function(results){
-      console.log('Done fetching all resources.');
-      var errorCount = 0;
+        // Log errors when things are not fetched...
+        results.forEach(function(result){
+          if (!result.isFulfilled()) {
+            errorCount+=1;
+            grunt.log.error('Fetch Error: ' , result.reason());
+          }
+        });
 
-      results.forEach(function(result){
-        if(result.isFulfilled()){
-          // console.log(result);
+        // Count errors and notify user
+        if (errorCount === 0) {
+          grunt.log.ok('Files fetched and saved to: \''+options.local_path+'\'');
         } else {
-          errorCount+=1;
-          grunt.log.error('Fetch Error: ' , result.reason());
+          grunt.log.error('Things did not go well for you.');
         }
       });
+    }
 
-      if (errorCount===0) {
-        grunt.log.ok('All files fetched and saved to: \''+options.local_path+'\'');
-      }
-    });
+    if (options.fetch_new) {
+      grunt.log.writeln('fetch_new = true, checking CDN resources...');
+      fetch_new();
+    } else {
+      grunt.log.writeln('fetch_new = false, not checking CDN resources.');
+    }
 
+    // Build HTML block with reource links pointing at CDN
     function buildHtmlBlockCDN(){
-      var html = ''
-        ,  parts = options.html.split('{{resource}}')
+      var parts = options.html.split('{{resource}}')
+        , html = ''
         ;
 
       options.resources.forEach(function(resource){
@@ -171,9 +199,11 @@ module.exports = function(grunt) {
     }
 
 
+    // Build HTML block with reource links pointing to Local
+    // versions of CDN files that were fetched
     function buildHtmlBlockLocal(){
-      var html = ''
-        ,  parts = options.html.split('{{resource}}')
+      var parts = options.html.split('{{resource}}')
+        , html = ''
         ;
 
       options.resources.forEach(function(url){
@@ -188,27 +218,35 @@ module.exports = function(grunt) {
     // Iterate over all specified fi groups.
     this.files.forEach(function(f) {
 
-      // var t = 0;
+      // Filter HTML files in the Grunt files list
       function filterHtml(node){
         var childNodes = node.children;
         node.children.forEach(function(child){
 
-          // t++;
-          // console.log(t, child.name, child.type);
-
           if (child.type === 'comment'){
             var splits = child.data.split('=');
 
+            // Scan an HTML file for comment nodes that contain "cdn-switch"
+            // and a target name for the grunt task.
+            // Eg: <!--cdn-switch:tagert-name-->
+
+            // When found...
             if (splits[0]==='cdn-switch' && splits[1]===options.comment) {
-            // if (splits[0]===' cdn-switch' && splits[1]===theTarget+' ') {
-              var html = options.cdn ?
-                buildHtmlBlockCDN() :
+
+              // Build new HTML blockdepending on mode...
+              var html = options.cdn  ?
+                buildHtmlBlockCDN()   :
                 buildHtmlBlockLocal() ;
 
+              // Write new block into DOM and notify
               $(child).replaceWith(html);
+
+              var mode = options.cdn ? 'CDN' : 'Local';
+              grunt.log.ok('Wrote '+mode+' block to \''+f.dest+'\'');
             }
           }
 
+          // If this node has children, recursively filter
           if (child.hasOwnProperty('children')){
             filterHtml(child);
           }
@@ -230,17 +268,16 @@ module.exports = function(grunt) {
         return grunt.file.read(filepath);
       }).join(grunt.util.normalizelf(options.separator));
 
+      // Load the HTML file into Cheerio DOM parser
       var $ = cheerio.load(src);
+
+      //Scan the DOM for places to switch CDN/Local resources
       filterHtml($._root);
+
+      // Flatten the DOM back to a string
       src = $.html();
 
-      // console.log('Scanned DOM in: \''+filepath+'\'');
-      console.log('Scanned DOM.');
-
-      // Handle options.
-      src += options.punctuation;
-
-      // Write the destination file.
+      // Write out the HTML string to the destination file
       grunt.file.write(f.dest, src);
 
       // Print a success message.
@@ -249,4 +286,3 @@ module.exports = function(grunt) {
   });
 
 };
-

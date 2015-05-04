@@ -38,7 +38,7 @@ module.exports = function(grunt) {
           html: '<script src="{{resource}}"></script>',
           // use cdn links?
           cdn: true,
-          always_fetch: false,
+          // fetch_new: true,
 
           // use local links
           // cdn: false,
