@@ -63,7 +63,7 @@ module.exports = function(grunt) {
   }
 
     var fetchPromises = [];
-    options.remote.forEach(function(url){
+    options.resources.forEach(function(url){
       var fetchFile = fetch(url)
       .then(function (filename){
           grunt.log.writeln('Got: ' + filename);
@@ -91,25 +91,54 @@ module.exports = function(grunt) {
       }
     });
 
-    var theTarget = this.target;
+    function buildHtmlBlockCDN(){
+      var html = ''
+        ,  parts = options.html.split('{{resource}}')
+        ;
+
+      options.resources.forEach(function(resource){
+        html += parts[0] + resource + parts[1] + ' \n';
+      });
+
+      return html;
+    }
+
+
+    function buildHtmlBlockLocal(){
+      var html = ''
+        ,  parts = options.html.split('{{resource}}')
+        ;
+
+      options.resources.forEach(function(url){
+        var filename = url.slice(url.lastIndexOf('/')+1);
+        html += parts[0] + options.local_path+'/'+filename + parts[1] + ' \n';
+      });
+
+      return html;
+    }
+
 
     // Iterate over all specified fi groups.
     this.files.forEach(function(f) {
 
-
-      var t = 0;
+      // var t = 0;
       function filterHtml(node){
         var childNodes = node.children;
         node.children.forEach(function(child){
-          t++;
 
-          console.log(t, child.name, child.type);
+          // t++;
+          // console.log(t, child.name, child.type);
+
           if (child.type === 'comment'){
             var splits = child.data.split('=');
 
-            if (splits[0]===' cdn-switch' && splits[1]===theTarget+' ') {
-              // $(child).replaceWith('ok ok ok!');
-              $(child).replaceWith('ok ok ok!');
+            if (splits[0]==='cdn-switch' && splits[1]===options.comment) {
+            // if (splits[0]===' cdn-switch' && splits[1]===theTarget+' ') {
+              var html = options.cdn ?
+                buildHtmlBlockCDN() :
+                buildHtmlBlockLocal() ;
+
+              $(child).replaceWith(html);
             }
           }
 
@@ -142,7 +171,7 @@ module.exports = function(grunt) {
       console.log('Scanned DOM.');
 
       // Handle options.
-      // src += options.punctuation;
+      src += options.punctuation;
 
       // Write the destination file.
       grunt.file.write(f.dest, src);

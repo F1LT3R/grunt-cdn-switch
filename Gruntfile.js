@@ -29,15 +29,21 @@ module.exports = function(grunt) {
     },
 
     cdn_switch: {
-      javascript: {
+      js_dev: {
         files: {
           'tmp/index.html': ['test/fixtures/index.html']
         },
         options: {
-          template: '<script src="{{remote}}"></script>',
+          comment: 'javascript',
+          html: '<script src="{{resource}}"></script>',
+          // use cdn links?
+          cdn: true,
           always_fetch: false,
+
+          // use local links
+          // cdn: false,
           local_path: 'tmp/static',
-          remote: [
+          resources: [
             'http://cdnjs.cloudflare.com/ajax/libs/angular.js/1.3.15/angular.min.js',
             'http://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular-animate.js',
             'http://cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.13/angular-ui-router.min.js',
