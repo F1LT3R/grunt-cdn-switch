@@ -14,7 +14,6 @@ var Promise = require('bluebird')
   , http = require('http')
   , fs = require('fs')
   , mkdirp = require('mkdirp')
-  , moment = require('moment')
   ;
 
 
@@ -22,29 +21,31 @@ module.exports = function(grunt) {
 
   // Please see the Grunt documentation for more information regarding task
   // creation: http://gruntjs.com/creating-tasks
-
   grunt.registerMultiTask('cdn_switch', 'Insert switchable Script and Style tags into your HTML that automatically link to Local or CDN resources.', function() {
-     var done = this.async();
 
-    // Merge task-specific and/or target-specific options with these defaults.
+    // Go async (fetching and waiting on remote servers)
+    var done = this.async();
+
+    // Reference options
     var options = this.options({
       punctuation: '.',
       separator: ', '
     });
 
-    mkdirp(options.local_path);
 
     function checkFileExists(file){
       var path = file.path;
-
       return new Promise(function(resolve, reject){
         fs.exists(path, function(exists) {
+
           resolve({
             path: path,
             origin: file.origin,
             exists: exists
           });
+
         });
+
       });
     }
 
@@ -69,8 +70,7 @@ module.exports = function(grunt) {
             path: path,
             origin: file.origin,
             modified: null,
-            exists: false
-          });
+         });
 
         }
       });
@@ -82,7 +82,8 @@ module.exports = function(grunt) {
         var path = file.path
           , url = file.origin
           , localModified = file.modified
-          ;
+          ;    exists: false
+
 
 
         var request = http.get(url, function(response) {
@@ -124,9 +125,10 @@ module.exports = function(grunt) {
     }
 
     function fetch(url){
+
       var filename = url.slice(url.lastIndexOf('/')+1);
       var local_filepath = options.local_path+'/'+filename;
-      grunt.log.writeln('Need: ' + url);
+      grunt.log.writeln('Checking: ' + url);
 
       return checkFileExists({
         path: local_filepath,
@@ -144,7 +146,7 @@ module.exports = function(grunt) {
         var fetchFile = fetch(url).then(function (response){
 
           if (response.notmodified) {
-            grunt.log.warn('Not modified: ' + response.path);
+            grunt.log.writeln('Not modified: ' + response.path);
           } else {
             grunt.log.ok('Got: ' + response);
           }
@@ -156,6 +158,8 @@ module.exports = function(grunt) {
         fetchPromises.push(fetchFile);
       });
 
+
+
       // Wait until all the promises are resolved, then settle
       Promise.settle(fetchPromises).then(function(results){
         grunt.log.writeln('Done fetching/checking resources.');
@@ -165,25 +169,31 @@ module.exports = function(grunt) {
         results.forEach(function(result){
           if (!result.isFulfilled()) {
             errorCount+=1;
-            grunt.log.error('Fetch Error: ' , result.reason());
+            grunt.log.error('Fetch Error: ' + result.reason());
           }
         });
 
         // Count errors and notify user
         if (errorCount === 0) {
-          grunt.log.ok('Files fetched and saved to: \''+options.local_path+'\'');
+          grunt.log.ok('Files checked-with/fetched-to: \''+options.local_path+'\'');
         } else {
           grunt.log.error('Things did not go well for you.');
         }
       });
     }
 
-    if (options.fetch_new) {
+
+
+    // Decide whether to fetch for resources...
+    if (options.fetch_new && !options.cdn) {
       grunt.log.writeln('fetch_new = true, checking CDN resources...');
+      mkdirp(options.local_path);
       fetch_new();
     } else {
       grunt.log.writeln('fetch_new = false, not checking CDN resources.');
     }
+
+
 
     // Build HTML block with reource links pointing at CDN
     function buildHtmlBlockCDN(){
@@ -197,7 +207,6 @@ module.exports = function(grunt) {
 
       return html;
     }
-
 
     // Build HTML block with reource links pointing to Local
     // versions of CDN files that were fetched
