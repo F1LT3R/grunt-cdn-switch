@@ -23,6 +23,8 @@ module.exports = function(grunt) {
   // creation: http://gruntjs.com/creating-tasks
   grunt.registerMultiTask('cdn_switch', 'Insert switchable Script and Style tags into your HTML that automatically link to Local or CDN resources.', function() {
 
+    var target = this.target;
+
     // Go async (fetching and waiting on remote servers)
     var done = this.async();
 
@@ -70,6 +72,7 @@ module.exports = function(grunt) {
             path: path,
             origin: file.origin,
             modified: null,
+            exists: false
          });
 
         }
@@ -83,6 +86,7 @@ module.exports = function(grunt) {
       return new Promise(function(resolve, reject){
         var path = file.path
           , url = file.origin
+          , exists = file.exists
           , localModified = file.modified
           ;
 
@@ -94,7 +98,8 @@ module.exports = function(grunt) {
             ;
 
           // If the remote file is newer than the local file...
-          if (remoteTime > localTime) {
+          // Or the local file does not exist...
+          if (remoteTime > localTime || !exists) {
 
             // Write the file.
             var file = fs.createWriteStream(path);
@@ -182,7 +187,13 @@ module.exports = function(grunt) {
         results.forEach(function(result){
           if (!result.isFulfilled()) {
             errorCount+=1;
-            grunt.log.error('Fetch Error: ' + result.reason());
+
+            grunt.log.error('Fetch Error in resources for block: \''+block.name+'\', in target \''+target+'\'.');
+            try{
+              console.log(result.reason());
+            }catch(e){
+              console.log(e);
+            }
           }
         });
 
@@ -190,7 +201,7 @@ module.exports = function(grunt) {
         if (errorCount === 0) {
           grunt.log.ok('\''+block.name+'\' files checked-with/fetched-to: \''+block.local_path+'\'');
         } else {
-          grunt.log.error('Things did not go well for you.');
+          grunt.fail.warn('CDN-Switch: Things did not go well for you :(');
         }
       });
     }
@@ -205,9 +216,11 @@ module.exports = function(grunt) {
         ;
 
       block.resources.forEach(function(resource){
-        html += parts[0] + resource + parts[1] + ' \n';
+        html += parts[0] + resource + parts[1] + '\n';
       });
 
+      // Remove trailling newline
+      html = html.slice(0, html.length-1);
       return html;
     }
 
@@ -218,13 +231,13 @@ module.exports = function(grunt) {
         , html = ''
         ;
 
-      // console.log(block.html);
       block.resources.forEach(function(url){
         var filename = url.slice(url.lastIndexOf('/')+1);
-        html += parts[0] + block.local_path+'/'+filename + parts[1] + ' \n';
+        html += parts[0] + block.local_path+'/'+filename + parts[1] + '\n';
       });
 
-      console.log('HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH', html);
+      // Remove trailling newline
+      html = html.slice(0, html.length-1);
       return html;
     }
 
@@ -244,16 +257,14 @@ module.exports = function(grunt) {
           if (splits[0]==='cdn-switch' && splits[1]===obj.block.name) {
 
             // Build new HTML blockdepending on mode...
-            var html = options.cdn        ?
-              buildHtmlBlockCDN(obj.block)    :
-              buildHtmlBlockLocal(obj.block)  ;
-
-              console.log(123, html);
+            var html = options.cdn ?
+              buildHtmlBlockCDN(obj.block) :
+              buildHtmlBlockLocal(obj.block) ;
 
             // Write new block into DOM and notify
             obj.$(child).replaceWith(html);
 
-            grunt.log.ok(mode+' \''+obj.block.name+'\' comment block replaced in: \''+obj.dest+'\'');
+            grunt.log.ok(mode+' \''+obj.block.name+'\' comment block written to: \''+obj.dest+'\'');
           }
         }
 
@@ -302,28 +313,28 @@ module.exports = function(grunt) {
         block.name = blockName;
 
         // Decide whether to fetch for resources...
-        if (options.fetch_new && !options.cdn) {
+        if (options.fetch_new) {
           mkdirp(block.local_path);
           grunt.log.writeln('Block \''+blockName+'\', fetch_new=true: checking CDN resources...');
           fetch_new(block);
-
-          // Load the HTML file into Cheerio DOM parser
-          var $ = cheerio.load(src);
-
-          //Scan the DOM for places to switch CDN/Local resources
-          filterHtml({
-            $: $,
-            dest: f.dest,
-            node: $._root,
-            block: block
-          });
-
-          // Flatten the DOM back to a string
-          src = $.html();
-          var insertedBlocks = true;
         } else {
           grunt.log.writeln('Block \''+blockName+'\', fetch_new=false: not checking CDN resources.');
         }
+
+        // Load the HTML file into Cheerio DOM parser
+        var $ = cheerio.load(src);
+
+        //Scan the DOM for places to switch CDN/Local resources
+        filterHtml({
+          $: $,
+          dest: f.dest,
+          node: $._root,
+          block: block
+        });
+
+        // Flatten the DOM back to a string
+        src = $.html();
+        var insertedBlocks = true;
       }
 
       // Write out the HTML string to the destination file
