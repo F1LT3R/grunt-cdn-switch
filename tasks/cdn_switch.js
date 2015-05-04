@@ -14,6 +14,7 @@ var Promise = require('bluebird')
   , http = require('http')
   , fs = require('fs')
   , mkdirp = require('mkdirp')
+  , moment = require('moment')
   ;
 
 
@@ -36,15 +37,63 @@ module.exports = function(grunt) {
 
   mkdirp(options.local_path);
 
-  function fetch(url){
-    return new Promise(function(resolve, reject) {
+  function checkFileExists(file){
+    var path = file.path;
 
-      var filename = url.slice(url.lastIndexOf('/')+1);
-      grunt.log.writeln('Need: ' + url);
+    return new Promise(function(resolve, reject){
+      fs.exists(path, function(exists) {
+        resolve({
+          path: path,
+          origin: file.origin,
+          exists: exists
+        });
+      });
+    });
+  }
+  function checkFileModifiedDate(file){
+    var path = file.path;
 
-      var file = fs.createWriteStream(options.local_path+'/'+filename);
+    return new Promise(function(resolve, reject){
+      if (file.exists) {
+
+        fs.stat(path, function(err, stats){
+          resolve({
+            path: path,
+            origin: file.origin,
+            modified: moment(stats.mtime).unix(),
+            exists: true
+          });
+        });
+
+      } else {
+
+        resolve({
+          path: path,
+          origin: file.origin,
+          modified: null,
+          exists: false
+        });
+
+      }
+    });
+  }
+
+
+  function requestHandler(file){
+    return new Promise(function(resolve, reject){
+      var path = file.path
+        , url = file.origin
+        , localModified = file.modified
+        ;
+
 
       var request = http.get(url, function(response) {
+      var lastModified = response.headers['last-modified'];
+
+        console.log(moment(lastModified).unix());
+
+        // var file = fs.createWriteStream(options.local_path+'/'+file.pathname);
+        var file = fs.createWriteStream(path);
         response.pipe(file);
 
         if (response.statusCode.toString()[0]==='4'){
@@ -55,10 +104,28 @@ module.exports = function(grunt) {
       }).on('error', function(e){
         reject(e);
       }).on('end', function(){
-        resolve(filename);
+        resolve(path);
       }).on('close', function(){
-        resolve(filename);
+        resolve(path);
       });
+
+    });
+  }
+
+  function fetch(url){
+    return new Promise(function(resolve, reject) {
+
+      var filename = url.slice(url.lastIndexOf('/')+1);
+      var local_filepath = options.local_path+'/'+filename;
+      grunt.log.writeln('Need: ' + url);
+
+      checkFileExists({
+        path: local_filepath,
+        origin: url
+      })
+      .then(checkFileModifiedDate)
+      .then(requestHandler);
+
     });
   }
 
