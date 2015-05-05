@@ -135,17 +135,17 @@ module.exports = function(grunt) {
 
 
     // Begin the fetch and date-modified check for a single fetch promise
-    function fetch(fetch){
-      var block = fetch.block
-      , filename = fetch.url.slice(fetch.url.lastIndexOf('/') + 1)
+    function fetch(fetchobj){
+      var block = fetchobj.block
+      , filename = fetchobj.url.slice(fetchobj.url.lastIndexOf('/') + 1)
       , local_filepath = block.local_path + '/' + filename
       ;
 
-      grunt.log.writeln('Checking: ' + fetch.url);
+      grunt.log.writeln('Checking: ' + fetchobj.url);
 
       return checkFileExists({
         path: local_filepath,
-        origin: fetch.url
+        origin: fetchobj.url
       })
       .then(checkFileModifiedDate)
       .then(requestHandler);
@@ -203,6 +203,8 @@ module.exports = function(grunt) {
         } else {
           grunt.fail.warn('CDN-Switch: Things did not go well for you :(');
         }
+
+        done();
       });
     }
 
@@ -334,12 +336,13 @@ module.exports = function(grunt) {
 
         // Flatten the DOM back to a string
         src = $.html();
-        var insertedBlocks = true;
+        insertedBlocks = true;
       }
 
       // Write out the HTML string to the destination file
       if (insertedBlocks) {
         grunt.file.write(f.dest, src);
+
       }
 
       // Print a success message.

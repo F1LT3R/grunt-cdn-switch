@@ -9,5 +9,14 @@
   "undef": true,
   "boss": true,
   "eqnull": true,
-  "node": true
+  "node": true,
+  "laxbreak": true,
+  "laxcomma": true,
+  "globals" : {
+    "$": true,
+    "jQuery": true,
+    "Promise": true,
+    "module": true,
+    "angular": true
+  }
 }

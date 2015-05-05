@@ -94,8 +94,6 @@ module.exports = function(grunt) {
       },
     },
 
-
-
     // Unit tests.
     nodeunit: {
       tests: ['test/*_test.js']
@@ -116,10 +114,5 @@ module.exports = function(grunt) {
   grunt.registerTask('test', ['clean', 'cdn_switch', 'nodeunit']);
 
   // By default, lint and run all tests.
-  // grunt.registerTask('default', ['jshint', 'test']);
-
-  grunt.registerTask('default', [
-    'cdn_switch'
-  ]);
-
+  grunt.registerTask('default', ['jshint', 'test']);
 };

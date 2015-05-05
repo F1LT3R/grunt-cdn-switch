@@ -27,22 +27,23 @@ exports.cdn_switch = {
     // setup here if necessary
     done();
   },
-  default_options: function(test) {
+  dev_options: function(test) {
     test.expect(1);
 
-    var actual = grunt.file.read('tmp/default_options');
-    var expected = grunt.file.read('test/expected/default_options');
-    test.equal(actual, expected, 'should describe what the default behavior is.');
+    var actual = grunt.file.read('tmp/index-dev.html');
+    var expected = grunt.file.read('test/expected/index-dev.html');
+    test.equal(actual, expected, 'default dev settings should work.');
 
     test.done();
   },
-  custom_options: function(test) {
+  prod_options: function(test) {
     test.expect(1);
 
-    var actual = grunt.file.read('tmp/custom_options');
-    var expected = grunt.file.read('test/expected/custom_options');
-    test.equal(actual, expected, 'should describe what the custom option(s) behavior is.');
+    var actual = grunt.file.read('tmp/index-prod.html');
+    var expected = grunt.file.read('test/expected/index-prod.html');
+    test.equal(actual, expected, 'default prod settings should work.');
 
     test.done();
   },
+
 };
