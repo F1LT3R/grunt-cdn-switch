@@ -11,9 +11,9 @@
 
 var Promise = require('bluebird')
   , cheerio = require('cheerio')
-  , mkdirp = require('mkdirp')
   , http = require('http')
   , fs = require('fs')
+  , mkdirp = require('mkdirp')
   ;
 
 
@@ -222,6 +222,13 @@ module.exports = function(grunt) {
         html += parts[0] + resource + parts[1] + '\n';
       });
 
+
+      if (block.injections) {
+        block.injections.forEach(function(injection){
+          html += parts[0] + injection + parts[1] + '\n';
+        });
+      }
+
       // Remove trailling newline
       html = html.slice(0, html.length-1);
       return html;
@@ -238,6 +245,13 @@ module.exports = function(grunt) {
         var filename = url.slice(url.lastIndexOf('/')+1);
         html += parts[0] + block.local_path+'/'+filename + parts[1] + '\n';
       });
+
+
+      if (block.injections) {
+        block.injections.forEach(function(injection){
+          html += parts[0] + injection + parts[1] + '\n';
+        });
+      }
 
       // Remove trailling newline
       html = html.slice(0, html.length-1);
