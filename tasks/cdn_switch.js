@@ -11,9 +11,9 @@
 
 var Promise = require('bluebird')
   , cheerio = require('cheerio')
+  , mkdirp = require('mkdirp')
   , http = require('http')
   , fs = require('fs')
-  , mkdirp = require('mkdirp')
   ;
 
 
@@ -22,6 +22,7 @@ module.exports = function(grunt) {
   // Please see the Grunt documentation for more information regarding task
   // creation: http://gruntjs.com/creating-tasks
   grunt.registerMultiTask('cdn_switch', 'Insert switchable Script and Style tags into your HTML that automatically link to Local or CDN resources.', function() {
+
 
     var target = this.target;
 
@@ -33,6 +34,8 @@ module.exports = function(grunt) {
       punctuation: '.',
       separator: ', '
     });
+
+    var mode = options.cdn ? 'CDN' : 'Local';
 
 
     function checkFileExists(file){
@@ -203,8 +206,6 @@ module.exports = function(grunt) {
         } else {
           grunt.fail.warn('CDN-Switch: Things did not go well for you :(');
         }
-
-        done();
       });
     }
 
@@ -287,8 +288,6 @@ module.exports = function(grunt) {
     // BEGIN HERE
     ////////////////////////////////////////////////////////////////////////////
 
-    var mode = options.cdn ? 'CDN' : 'Local';
-
     // Iterate over all specified fi groups.
     this.files.forEach(function(f) {
 
@@ -342,11 +341,12 @@ module.exports = function(grunt) {
       // Write out the HTML string to the destination file
       if (insertedBlocks) {
         grunt.file.write(f.dest, src);
-
       }
 
       // Print a success message.
       grunt.log.writeln('File "' + f.dest + '" created.');
+
+      done();
     });
 
   });
