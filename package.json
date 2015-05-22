@@ -2,22 +2,22 @@
   "name": "grunt-cdn-switch",
   "description": "Insert switchable Script and Style tags into your HTML that automatically link to Local or CDN resources.",
   "version": "0.1.3",
-  "homepage": "https://github.com/alistair/grunt-cdn-switch",
+  "homepage": "https://github.com/f1lt3r/grunt-cdn-switch",
   "author": {
     "name": "Alistair MacDonald",
     "email": "al@pwn.io"
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/alistair/grunt-cdn-switch.git"
+    "url": "git://github.com/f1lt3r/grunt-cdn-switch.git"
   },
   "bugs": {
-    "url": "https://github.com/alistair/grunt-cdn-switch/issues"
+    "url": "https://github.com/f1lt3r/grunt-cdn-switch/issues"
   },
   "licenses": [
     {
       "type": "MIT",
-      "url": "https://github.com/alistair/grunt-cdn-switch/blob/master/LICENSE-MIT"
+      "url": "https://github.com/f1lt3r/grunt-cdn-switch/blob/master/LICENSE-MIT"
     }
   ],
   "engines": {
