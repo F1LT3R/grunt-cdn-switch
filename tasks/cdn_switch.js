@@ -191,7 +191,7 @@ module.exports = function(grunt) {
           if (!result.isFulfilled()) {
             errorCount+=1;
 
-            grunt.log.error('Fetch Error in resources for block: \''+block.name+'\', in target \''+target+'\'.');
+            grunt.log.warn('Fetch Error in resources for block: \''+block.name+'\', in target \''+target+'\'.');
             try{
               console.log(result.reason());
             }catch(e){
@@ -204,7 +204,7 @@ module.exports = function(grunt) {
         if (errorCount === 0) {
           grunt.log.ok('\''+block.name+'\' files checked-with/fetched-to: \''+block.local_path+'\'');
         } else {
-          grunt.fail.warn('CDN-Switch: Things did not go well for you :(');
+          grunt.log.warn('CDN-Switch: Things did not go well for you :(');
         }
       });
     }
@@ -225,7 +225,9 @@ module.exports = function(grunt) {
 
       if (block.injections) {
         block.injections.forEach(function(injection){
-          html += parts[0] + injection + parts[1] + '\n';
+          // html += parts[0] + injection + parts[1] + '\n';
+          html += injection + '\n';
+          return injection;
         });
       }
 
@@ -249,7 +251,9 @@ module.exports = function(grunt) {
 
       if (block.injections) {
         block.injections.forEach(function(injection){
-          html += parts[0] + injection + parts[1] + '\n';
+          html += injection + '\n';
+          // html += parts[0] + injection + parts[1] + '\n';
+          return injection;
         });
       }
 
