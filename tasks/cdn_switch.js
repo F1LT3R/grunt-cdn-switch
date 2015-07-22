@@ -56,6 +56,7 @@ module.exports = function(grunt) {
 
     function checkFileModifiedDate(file){
       var path = file.path;
+
       return new Promise(function(resolve, reject){
 
         if (file.exists) {
@@ -87,40 +88,34 @@ module.exports = function(grunt) {
     // events. Don't fetch file if you already have it locally.
     function requestHandler(file){
       return new Promise(function(resolve, reject){
-        var path = file.path
-          , url = file.origin
-          , exists = file.exists
-          , localModified = file.modified
-          ;
 
-        // Beging the request. Alias for cancellation (end).
-        var request = http.get(url, function(response) {
-          var remoteModified = response.headers['last-modified']
-            , localTime = new Date(localModified).getTime()
-            , remoteTime = new Date(remoteModified).getTime()
+        var request = http.get(file.origin, function(response) {
+
+          var localTime = new Date(file.modified).getTime()
+            , remoteTime = new Date(response.headers['last-modified']).getTime()
             ;
 
           // If the remote file is newer than the local file...
           // Or the local file does not exist...
-          if (remoteTime > localTime || !exists) {
+          if (remoteTime > localTime || !file.exists) {
 
             // Write the file.
-            var file = fs.createWriteStream(path);
-            response.pipe(file);
+            var local_file = fs.createWriteStream(file.path);
+            response.pipe(local_file);
 
           // Duck out if there are HTTP Status code errors
           } else {
             request.end();
             resolve({
               notmodified: true,
-              path: path
+              path: file.path
             });
           }
 
           // Duck out if there are HTTP Status code errors
           if (response.statusCode.toString()[0] === '4'){
             var error = {};
-            error[response.statusCode] = url;
+            error[response.statusCode] = file.url;
             reject(error);
           }
 
@@ -128,9 +123,9 @@ module.exports = function(grunt) {
         }).on('error', function(e){
           reject(e);
         }).on('end', function(){
-          resolve(path);
+          resolve(file.origin);
         }).on('close', function(){
-          resolve(path);
+          resolve(file.origin);
         });
 
       });
@@ -144,7 +139,11 @@ module.exports = function(grunt) {
       , local_filepath = block.local_path + '/' + filename
       ;
 
-      grunt.log.writeln('Checking: ' + fetchobj.url);
+      if (options.fetch_new) {
+        grunt.log.writeln('Check: ' + fetchobj.url);
+      } else if (options.fetch_once) {
+        grunt.log.writeln('Check: ' + local_filepath);
+      }
 
       return checkFileExists({
         path: local_filepath,
@@ -157,59 +156,64 @@ module.exports = function(grunt) {
 
     // Build a stack of promises based on the resource list
     function fetch_new (block) {
-      var fetchPromises = [];
+      return new Promise(function (resolve, reject) {
 
-      // Create a promise for each fle
-      block.resources.forEach(function(url){
+        var fetchPromises = [];
 
-        // Push the new promise onto the stack
-        fetchPromises.push(fetch({
-          block:block,
-          url: url
+        // Create a promise for each fle
+        block.resources.forEach(function(url){
+          // Push the new promise onto the stack
+          fetchPromises.push(fetch({
+            block:block,
+            url: url
 
-        }).then(function (response){
+          }).then(function (response){
 
-          if (response.notmodified) {
-            grunt.log.writeln('Not modified: ' + response.path);
-          } else {
-            grunt.log.ok('Got: ' + response);
-          }
-          return response.path;
-        }));
-
-      });
-
-
-
-      // Wait until all the promises are resolved, then settle
-      Promise.settle(fetchPromises).then(function(results){
-        grunt.log.writeln('Done fetching/checking resources.');
-        var errorCount = 0;
-
-        // Log errors when things are not fetched...
-        results.forEach(function(result){
-          if (!result.isFulfilled()) {
-            errorCount+=1;
-
-            grunt.log.warn('Fetch Error in resources for block: \''+block.name+'\', in target \''+target+'\'.');
-            try{
-              console.log(result.reason());
-            }catch(e){
-              console.log(e);
+            if (response.notmodified) {
+              grunt.log.writeln('Nomod: ' + response.path);
+            } else {
+              grunt.log.writeln('Saved: ' + response);
             }
+            return response.path;
+          }));
+
+          return fetchPromises;
+
+        });
+
+        // Wait until all the promises are resolved, then settle
+        Promise.settle(fetchPromises).then(function(results){
+          grunt.log.writeln('Done fetching/checking resources.');
+          var errorCount = 0;
+
+          // Log errors when things are not fetched...
+          results.forEach(function(result){
+            if (!result.isFulfilled()) {
+              errorCount+=1;
+
+              grunt.log.warn('Fetch Error in resources for block: \''+block.name+'\', in target \''+target+'\'.');
+              try{
+                console.log(result.reason());
+              }catch(e){
+                console.log(e);
+              }
+            }
+          });
+
+          // Count errors and notify user
+          if (errorCount === 0) {
+            var success_msg = '\''+block.name+'\' files checked-with/fetched-to: \''+block.local_path+'\'';
+            grunt.log.ok(success_msg);
+            resolve(success_msg);
+          } else {
+            var error_msg = 'CDN-Switch: Things did not go well for you :\'(';
+            grunt.log.warn(error_msg);
+            reject(error_msg);
           }
         });
 
-        // Count errors and notify user
-        if (errorCount === 0) {
-          grunt.log.ok('\''+block.name+'\' files checked-with/fetched-to: \''+block.local_path+'\'');
-        } else {
-          grunt.log.warn('CDN-Switch: Things did not go well for you :(');
-        }
       });
     }
-
-
 
 
     // Build HTML block with reource links pointing at CDN
@@ -324,22 +328,9 @@ module.exports = function(grunt) {
       }).join(grunt.util.normalizelf(options.separator));
 
 
-      var insertedBlocks = false;
 
-      // For each block in the target...
-      for (var blockName in options.blocks){
-        var block = options.blocks[blockName];
-        block.name = blockName;
 
-        // Decide whether to fetch for resources...
-        if (options.fetch_new) {
-          mkdirp(block.local_path);
-          grunt.log.writeln('Block \''+blockName+'\', fetch_new=true: checking CDN resources...');
-          fetch_new(block);
-        } else {
-          grunt.log.writeln('Block \''+blockName+'\', fetch_new=false: not checking CDN resources.');
-        }
-
+      function compileHTML (block, src) {
         // Load the HTML file into Cheerio DOM parser
         var $ = cheerio.load(src);
 
@@ -353,18 +344,57 @@ module.exports = function(grunt) {
 
         // Flatten the DOM back to a string
         src = $.html();
+
         insertedBlocks = true;
+
+        return src;
       }
 
-      // Write out the HTML string to the destination file
-      if (insertedBlocks) {
-        grunt.file.write(f.dest, src);
+
+
+      var insertedBlocks = false
+        , blockPromises = []
+        ;
+
+      // For each block in the target...
+      for (var blockName in options.blocks){
+
+        var block = options.blocks[blockName];
+        block.name = blockName;
+        mkdirp(block.local_path);
+
+        // Decide whether to fetch for resources...
+        if (options.fetch_new && !options.fetch_once) {
+          grunt.log.writeln('Block: \''+blockName+'\', fetch_new: checking CDN resources:');
+          blockPromises.push(fetch_new(block));
+
+        } else if (options.fetch_once && !options.fetch_new) {
+          grunt.log.writeln('Block: \''+blockName+'\', fetch_once: checking Local resources:');
+          blockPromises.push(fetch_new(block));
+
+        } else {
+          grunt.log.writeln('Block: \''+blockName+'\', no_fetch: not checking resources.');
+        }
+
+        src = compileHTML(block, src);
       }
 
-      // Print a success message.
-      grunt.log.writeln('File "' + f.dest + '" created.');
 
-      done();
+      Promise.settle(blockPromises).then(function () {
+
+        // Write out the HTML string to the destination file
+        if (insertedBlocks) {
+          grunt.file.write(f.dest, src);
+        }
+
+        // Print a success message.
+        grunt.log.writeln('File "' + f.dest + '" created.');
+
+        done();
+      });
+
+
+
     });
 
   });
