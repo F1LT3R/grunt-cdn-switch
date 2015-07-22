@@ -35,7 +35,6 @@ module.exports = function(grunt) {
       separator: ', '
     });
 
-    var mode = options.cdn ? 'CDN' : 'Local';
 
 
     function checkFileExists(file){
@@ -89,7 +88,7 @@ module.exports = function(grunt) {
     function requestHandler(file){
       return new Promise(function(resolve, reject){
 
-        var request = http.get(file.origin, function(response) {
+        var request = http.get(file.origin, function (response) {
 
           var localTime = new Date(file.modified).getTime()
             , remoteTime = new Date(response.headers['last-modified']).getTime()
@@ -97,7 +96,7 @@ module.exports = function(grunt) {
 
           // If the remote file is newer than the local file...
           // Or the local file does not exist...
-          if (remoteTime > localTime || !file.exists) {
+          if ( (remoteTime > localTime && options.use_local.fetch_newer ) || !file.exists) {
 
             // Write the file.
             var local_file = fs.createWriteStream(file.path);
@@ -133,15 +132,15 @@ module.exports = function(grunt) {
 
 
     // Begin the fetch and date-modified check for a single fetch promise
-    function fetch(fetchobj){
+    function check(fetchobj){
       var block = fetchobj.block
       , filename = fetchobj.url.slice(fetchobj.url.lastIndexOf('/') + 1)
       , local_filepath = block.local_path + '/' + filename
       ;
 
-      if (options.fetch_new) {
-        grunt.log.writeln('Check: ' + fetchobj.url);
-      } else if (options.fetch_once) {
+      if (options.use_local.fetch_newer) {
+        grunt.log.writeln('Compare: ' + fetchobj.url + ' === ' + local_filepath);
+      } else if (options.use_local) {
         grunt.log.writeln('Check: ' + local_filepath);
       }
 
@@ -154,26 +153,30 @@ module.exports = function(grunt) {
     }
 
 
+
+
     // Build a stack of promises based on the resource list
-    function fetch_new (block) {
+    function check_files (block) {
       return new Promise(function (resolve, reject) {
 
         var fetchPromises = [];
 
-        // Create a promise for each fle
         block.resources.forEach(function(url){
-          // Push the new promise onto the stack
-          fetchPromises.push(fetch({
-            block:block,
+          fetchPromises.push(check({
+            block: block,
             url: url
-
           }).then(function (response){
 
-            if (response.notmodified) {
-              grunt.log.writeln('Nomod: ' + response.path);
-            } else {
-              grunt.log.writeln('Saved: ' + response);
+            if (!response.notmodified && options.use_local.fetch_newer) {
+              grunt.log.writeln('Remote newer: ' + response);
+            } else if (response.notmodified && options.use_local.fetch_newer) {
+              grunt.log.writeln('Remote not newer: ' + response.path);
+            } else if (response.notmodified && options.use_local) {
+              grunt.log.writeln('Exists: ' + response.path);
+            } else if (options.use_local) {
+              grunt.log.writeln('Fetch non-existing: ' + response);
             }
+
             return response.path;
           }));
 
@@ -282,14 +285,14 @@ module.exports = function(grunt) {
           if (splits[0]==='cdn-switch' && splits[1]===obj.block.name) {
 
             // Build new HTML blockdepending on mode...
-            var html = options.cdn ?
-              buildHtmlBlockCDN(obj.block) :
-              buildHtmlBlockLocal(obj.block) ;
+            var html = options.use_local ?
+              buildHtmlBlockLocal(obj.block) :
+              buildHtmlBlockCDN(obj.block) ;
 
             // Write new block into DOM and notify
             obj.$(child).replaceWith(html);
 
-            grunt.log.ok(mode+' \''+obj.block.name+'\' comment block written to: \''+obj.dest+'\'');
+            grunt.log.ok('Write: \''+obj.block.name+'\' comment block written to: \''+obj.dest+'\'');
           }
         }
 
@@ -311,7 +314,7 @@ module.exports = function(grunt) {
     ////////////////////////////////////////////////////////////////////////////
 
     // Iterate over all specified fi groups.
-    this.files.forEach(function(f) {
+    this.files.forEach(function (f) {
 
       // Concat specified files.
       var src = f.src.filter(function(filepath) {
@@ -353,7 +356,7 @@ module.exports = function(grunt) {
 
 
       var insertedBlocks = false
-        , blockPromises = []
+        , promiseStack = []
         ;
 
       // For each block in the target...
@@ -361,26 +364,18 @@ module.exports = function(grunt) {
 
         var block = options.blocks[blockName];
         block.name = blockName;
+
         mkdirp(block.local_path);
 
-        // Decide whether to fetch for resources...
-        if (options.fetch_new && !options.fetch_once) {
-          grunt.log.writeln('Block: \''+blockName+'\', fetch_new: checking CDN resources:');
-          blockPromises.push(fetch_new(block));
-
-        } else if (options.fetch_once && !options.fetch_new) {
-          grunt.log.writeln('Block: \''+blockName+'\', fetch_once: checking Local resources:');
-          blockPromises.push(fetch_new(block));
-
-        } else {
-          grunt.log.writeln('Block: \''+blockName+'\', no_fetch: not checking resources.');
+        if (options.use_local) {
+          promiseStack.push(check_files(block));
         }
 
         src = compileHTML(block, src);
       }
 
 
-      Promise.settle(blockPromises).then(function () {
+      Promise.settle(promiseStack).then(function () {
 
         // Write out the HTML string to the destination file
         if (insertedBlocks) {
