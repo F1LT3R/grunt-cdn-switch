@@ -94,8 +94,6 @@ module.exports = function(grunt) {
           'tmp/index-dev.html': ['test/fixtures/index.html']
         },
         options: {
-          cdn: false,
-          fetch_new: true,
           blocks: {
             javascript: {
               local_path: 'tmp/static',
@@ -127,7 +125,6 @@ module.exports = function(grunt) {
           'tmp/index-prod.html': ['test/fixtures/index.html']
         },
         options: {
-          cdn: true,
           blocks: {
             javascript: {
               html: '<script src="{{resource}}"></script>',

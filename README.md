@@ -62,9 +62,17 @@ For example: the following `<!--cdn-switch=javascript-->` can be replace with a 
 ```
 
 
-#### Local or Development Configuration
+#### Basic Local Config
 
-The output above is generated using the following Grunt config.
+Use a configuration like this when you want to fetch resources "only once" from the CDN, and store them in your local path.
+
+This configuration will:
+
+ 1. Fetch the resources from the CDN (when not found in `local_path`)
+ 2. Store resources in the `local_path`
+ 3. Replace the HTML comment block with `<script>` tags linking to the `local_path` resources
+
+**Config:**
 
 ```javascript
 grunt.initConfig({
@@ -74,8 +82,7 @@ grunt.initConfig({
         'dest/index.html': ['templates/index.html']
       },
       options: {
-        cdn: false,
-        fetch_new: true,
+        use_local: true,
         blocks: {
           javascript: {
             local_path: 'dest/js',
@@ -93,27 +100,51 @@ grunt.initConfig({
 });
 ```
 
+**Output:**
 
-#### Deployment or Production Configuration
+```html
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+<script src="dest/js/angular.min.js"></script>
+<script src="dest/js/angular-animate.js"></script>
+<script src="dest/js/angular-ui-router.min.js"></script>
+</body>
+</html>
+```
 
-When you want to use CDN versions of your resources, your `Gruntfile.js` might look like this:
+
+#### Fetch_Newer Local Config
+
+Use a configuration like this when you want your local files to stay up-top-date with the CDN.
+
+This configuration will:
+
+ 1. Fetch the resources from the CDN (when newer than resources found in `local_path`)
+ 2. Store any newer resources in the `local_path`
+ 3. Replace the HTML comment block with `<script>` tags linking to the `local_path` resources
+
+**Config:**
 
 ```javascript
 grunt.initConfig({
   cdn_switch: {
-    'myProdTarget': {
+    'myDevTarget': {
       files: {
         'dest/index.html': ['templates/index.html']
       },
       options: {
-        cdn: true,
+        use_local: {
+          fetch_newer: true,
+        },
         blocks: {
           javascript: {
+            local_path: 'dest/js',
             html: '<script src="{{resource}}"></script>',
             resources: [
-              'http://cdnjs.cloudflare.com/ajax/libs/angular.js/1.3.15/angular.min.js',
-              'http://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular-animate.js',
-              'http://cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.13/angular-ui-router.min.js',
+              'http://code.jquery.com/jquery-latest.js',
             ],
           },
         }
@@ -123,7 +154,7 @@ grunt.initConfig({
 });
 ```
 
-The above `Gruntfile.js` config would produce something like this:
+**Output:**
 
 ```html
 <!DOCTYPE html>
@@ -131,29 +162,87 @@ The above `Gruntfile.js` config would produce something like this:
 <head>
 </head>
 <body>
-<script src="http://cdnjs.cloudflare.com/ajax/libs/angular.js/1.3.15/angular.min.js"></script>
-<script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular-animate.js"></script>
-<script src="http://cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.13/angular-ui-router.min.js"></script>
+<script src="dest/js/jquery-latest.js"></script>
 </body>
 </html>
 ```
 
 
+#### CDN Config
+
+Use a configuration like this when you do not want to store any of the files locally, and you want to include script tags that link to your resources on the CDN.
+
+This configuration will:
+
+ 1. Replace the HTML comment block with `<script>` tags linking to the `local_path` resources
+
+**Config:**
+
+```javascript
+grunt.initConfig({
+  cdn_switch: {
+    'myDevTarget': {
+      files: {
+        'dest/index.html': ['templates/index.html']
+      },
+      options: {
+        use_local: false,
+        blocks: {
+          javascript: {
+            local_path: 'dest/js',
+            html: '<script src="{{resource}}"></script>',
+            resources: [
+              'http://code.jquery.com/jquery-latest.js',
+            ],
+          },
+        }
+      }
+    },
+  }
+});
+```
+
+**Output:**
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+<script src="http://code.jquery.com/jquery-latest.js"></script>
+</body>
+</html>
+```
+
+
+
 ### Options
 
-#### options.cdn
+#### options.use_local
 Type: `boolean`
 Default value: `false`
 
-When `true` grunt-cdn-switch will render the HTML with the CDN files. When `false` grunt-cdn-switch will render the HTML block with links to local files using the `local_path` option.
+When `use_local:true` grunt-cdn-switch will:
 
-#### options.fetch_new
+ 1. Fetch any files not found in `local_path`
+ 2. Replace the HTML comment block with `<script>` tags linking to the `local_path` resources
+
+When `use_local:false` grunt-cdn-switch will:
+
+ 0. Download nothing
+ 1. Replace the HTML comment block with `<script>` tags linking to the CDN resources
+
+#### options.use_local.fetch_new
 Type: `boolean`
 Default value: `false`
 
-When `fetch_new` is set to `true`, grunt-cdn-switch will always check if the CDN resources are newer than the local resources in the `local_path`, and save the newer versions where necessary.
+When `options.use_local.fetch_new:true` grunt-cdn-switch will:
 
-If the resources do not exist in the `local_path`, they will also be fetched.
+ 1. Fetch any files not found in `local_path`
+ 2. Overwrites any files in `local_path` that are older than the _last-modified) dates of their CDN links
+ 3. Replace the HTML comment block with `<script>` tags linking to the `local_path` resources
+
 
 #### options.blocks.`[name]`
 
@@ -212,7 +301,7 @@ And the output where `cdn` equals `false` and `local_path` equals `/dest/js` mig
 Type: `String`
 Default value: 'null`
 
-This string is the path that your CDN resources will be saved to when fetched, and will also be used to write the HTML block for your resources when `cdn` is set to `false`.
+This string is the path that your CDN resources will be saved to when fetched, and will also be used to write the HTML block for your resources when `use_local` is `false`.
 
 
 ### Usage Examples
@@ -253,10 +342,11 @@ grunt.initConfig({
       options: {
         // When false, this switch causes cdn_swith to render the HTML
         // block with links to local files
-        cdn: false,
-        // Always fetch resources when remote files are newer that local
-        // or when local files do not exist.
-        fetch_new: true,
+        use_local: {
+          // Always fetch resources when remote files are newer than local
+          // or when local files do not exist.
+          fetch_new: true,
+        }
 
         // "blocks" refers to HTML comment blocks that we want to replace
         blocks: {
@@ -280,9 +370,7 @@ grunt.initConfig({
             // "resources" is a list of remote resources that you want to
             // inject where the HTML comment block used to be.
             resources: [
-              'http://cdnjs.cloudflare.com/ajax/libs/angular.js/1.3.15/angular.min.js',
-              'http://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular-animate.js',
-              'http://cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.13/angular-ui-router.min.js',
+              'http://cdnjs.cloudflare.com/ajax/libs/c3/0.4.10/c3.min.js',
             ],
           },
 
@@ -298,7 +386,7 @@ grunt.initConfig({
 
             // And we only have once CSS resource to load
             resources: [
-              'http://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css',
+              'http://cdnjs.cloudflare.com/ajax/libs/c3/0.4.10/c3.min.css',
             ],
           },
         },
@@ -315,22 +403,19 @@ grunt.registerTask('default', ['cdn_switch:myDevTarget']);
 
 When running the above config, the console output should look similar to this:
 
-![grunt-cdn-switch Command Line Output](http://i.imgur.com/2IVYmRn.png)
-
 ```shell
-Running "cdn_switch:myDevTarget" (cdn_switch) task
-Block 'javascript', fetch_new=true: checking CDN resources...
-Checking: http://cdnjs.cloudflare.com/ajax/libs/angular.js/1.3.15/angular.min.js
-Checking: http://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular-animate.js
-Checking: http://cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.13/angular-ui-router.min.js
-Block 'css', fetch_new=true: checking CDN resources...
-Checking: http://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css
-File "dest/index.html" created.
->> Got: dest/js/angular-ui-router.min.js
->> Got: dest/js/angular.min.js
->> Got: dest/css/bootstrap.min.css
+Running "cdn_switch:prod" (cdn_switch) task
+Check: static/js/c3.min.js
+>> Write: 'javascript' comment block written to: 'static/index.html'
+Check: static/css/c3.min.css
+>> Write: 'css' comment block written to: 'static/index.html'
+Fetch non-existing: http://cdnjs.cloudflare.com/ajax/libs/c3/0.4.10/c3.min.css
 Done fetching/checking resources.
->> 'css' files checked-with/fetched-to: 'dest/css'
+>> 'css' files checked-with/fetched-to: 'static/css'
+Fetch non-existing: http://cdnjs.cloudflare.com/ajax/libs/c3/0.4.10/c3.min.js
+Done fetching/checking resources.
+>> 'javascript' files checked-with/fetched-to: 'static/js'
+File "static/index.html" created.
 
 Done, without errors.
 ```
@@ -342,12 +427,10 @@ Done, without errors.
 <!DOCTYPE html>
 <html>
 <head>
-<link href="tmp/static/bootstrap.min.css" rel="stylesheet">
+<link href="dest/static/c3.min.css" rel="stylesheet">
 </head>
 <body>
-<script src="tmp/static/angular.min.js"></script>
-<script src="tmp/static/angular-animate.js"></script>
-<script src="tmp/static/angular-ui-router.min.js"></script>
+<script src="dest/static/c3.min.js"></script>
 </body>
 </html>
 ```
