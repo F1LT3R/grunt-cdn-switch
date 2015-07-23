@@ -30,3 +30,4 @@ node_modules
 # tmp
 tmp
 static/
+dest/
