@@ -129,7 +129,7 @@ exports.cdn_switch = {
         if (!result.isFulfilled()) {
         } else {
           errorCount += 1;
-          console.log('LOCAL SHOULD NOT NOT EXIST (but:');
+          console.log('LOCAL SHOULD NOT NOT EXIST (but does):');
           console.log(result);
         }
       });
