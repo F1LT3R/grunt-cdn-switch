@@ -28,7 +28,8 @@ This provides an easy way to develop locally without having to rely on fetching 
 The typical use case for `grunt-cdn-switch` is as follows: 
 
  - As a Developer, I would like to use local JavaScript files to develop on my laptop, even when the stability of my Internet connection is poor, so that my flow is not disrupted and I can focus on my work where ever I may be.
- - As a Dev-Ops Engineer, I would like to have the code automatically pull from CDNs when running in production, as I do not wish to create additional load on my server where it is not necessary.
+ - As a Dev-Ops Engineer, I would like to have the code loaded from CDNs when running in production, as I do not wish to create additional load on my server where it is not necessary.
+ - As a Security Analyst, I would like to store the code locally when building in production, so that I do not have to rely on a CDN using an untrusted security certificate.
 
 For example: the following `<!--cdn-switch=javascript-->` can be replace with a list of
 `<script>` tags.
