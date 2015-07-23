@@ -3,8 +3,9 @@
 > Insert switchable Script and Style tags into your HTML that automatically link to Local or CDN resources.
 
 ## Getting Started
-This plugin requires Grunt `~0.4.5`
-This plugin requires Node '^0.12.01`
+
+ - This plugin requires Grunt `~0.4.5`
+ - This plugin requires Node `^0.12.01`
 
 If you haven't used [Grunt](http://gruntjs.com/) before, be sure to check out the [Getting Started](http://gruntjs.com/getting-started) guide, as it explains how to create a [Gruntfile](http://gruntjs.com/sample-gruntfile) as well as install and use Grunt plugins. Once you're familiar with that process, you may install this plugin with this command:
 
